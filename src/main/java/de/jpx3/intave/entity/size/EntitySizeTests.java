@@ -74,6 +74,9 @@ public final class EntitySizeTests extends IntegrationTests {
     severity = Severity.ERROR
   )
   public void testUnknownEntityClass() {
+    if (!VER26_2.atOrAbove()) {
+      return;
+    }
     HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(EntitySizeTests.class);
     if (size.width() != 0 || size.height() != 0) {
       fail("Unknown entity size is not zero: " + size);
