@@ -6,6 +6,7 @@ import de.jpx3.intave.block.access.VolatileBlockAccess;
 import de.jpx3.intave.block.fluid.Fluids;
 import de.jpx3.intave.block.physics.BlockPhysics;
 import de.jpx3.intave.block.physics.BlockProperties;
+import de.jpx3.intave.block.physics.PotentSulfurPhysics;
 import de.jpx3.intave.check.movement.physics.environment.SimulationEnvironment;
 import de.jpx3.intave.diagnostic.timings.Timings;
 import de.jpx3.intave.executor.Synchronizer;
@@ -516,6 +517,8 @@ class BaseSimulator extends Simulator {
     } else if (!elytraFlying) {
       simulateNormalAfter(user, environment, motion, gravity, slipperiness);
     }
+
+    PotentSulfurPhysics.apply(user, environment, motion, boundingBox);
 
     if (user.meta().protocol().newBlockEntityIntersectionLogic()) {
       simulateApplyEffectsFromBlocks(user, environment, motion, boundingBox);
