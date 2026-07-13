@@ -78,7 +78,7 @@ public final class PotentSulfurPhysics {
       return -1;
     }
 
-    int plumeTop = Math.min(sulfurY + 1 + 6 * waterDepth, UPPER_WORLD_LIMIT);
+    int plumeTop = sulfurY + 1 + 6 * waterDepth;
     for (int y = firstPassableY; y < plumeTop; y++) {
       if (!passable(user, world, x, y, z)) {
         return y;
@@ -96,6 +96,9 @@ public final class PotentSulfurPhysics {
   }
 
   private static boolean sourceWater(User user, World world, int x, int y, int z) {
+    if (!insideWorld(y)) {
+      return false;
+    }
     Material type = VolatileBlockAccess.typeAccess(user, world, x, y, z);
     Fluid fluid = VolatileBlockAccess.fluidAccess(user, world, x, y, z);
     // Fluid source metadata is not retained; 26.2 non-WATER water states are source-only.
@@ -105,9 +108,16 @@ public final class PotentSulfurPhysics {
   }
 
   private static boolean passable(User user, World world, int x, int y, int z) {
+    if (!insideWorld(y)) {
+      return true;
+    }
     Material type = VolatileBlockAccess.typeAccess(user, world, x, y, z);
     return type == Material.AIR
       || type == Material.WATER
       || VolatileBlockAccess.collisionShapeAccess(user, x, y, z).isEmpty();
+  }
+
+  private static boolean insideWorld(int y) {
+    return y >= LOWER_WORLD_LIMIT && y < UPPER_WORLD_LIMIT;
   }
 }

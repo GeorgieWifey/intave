@@ -3,6 +3,7 @@ package de.jpx3.intave.block.physics;
 import de.jpx3.intave.adapter.MinecraftVersions;
 import de.jpx3.intave.block.cache.BlockCache;
 import de.jpx3.intave.block.cache.BlockCaches;
+import de.jpx3.intave.block.shape.BlockShape;
 import de.jpx3.intave.module.tracker.entity.Entity;
 import de.jpx3.intave.share.BoundingBox;
 import de.jpx3.intave.share.Motion;
@@ -24,12 +25,15 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
+
+import static de.jpx3.intave.world.WorldHeight.UPPER_WORLD_LIMIT;
 
 public final class PotentSulfurPhysicsTests extends IntegrationTests {
   private static final double LAUNCH = 0.20000000298023224D;
@@ -42,6 +46,7 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
   private int baseX;
   private int baseY;
   private int baseZ;
+  private UUID playerId;
   private int protocolVersion;
   private boolean flying;
   private GameMode gameMode;
@@ -62,8 +67,9 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
     baseZ = spawn.getBlockZ() + 8;
     protocolVersion = ProtocolMetadata.VER_26_2;
     gameMode = GameMode.SURVIVAL;
+    playerId = UUID.randomUUID();
 
-    player = FakePlayerFactory.createPlayer((method, arguments) -> {
+    player = FakePlayerFactory.createPlayer(playerId, (method, arguments) -> {
       switch (method) {
         case "getWorld":
           return world;
@@ -80,6 +86,7 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
       }
       return null;
     });
+    assertEquals(playerId, player.getUniqueId());
     blockCache = BlockCaches.passthroughCacheWithNativeDrill(player);
     user = UserFactory.createTestUserFor(player, (testUser, key) -> {
       if ("protocolVersion".equals(key)) {
@@ -153,6 +160,17 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
     assertEquals(0.0, apply(0.0, boxAt(baseX, baseY + 4.01)));
   }
 
+  @Test(testCode = "CEILING", severity = Severity.ERROR)
+  public void plumeExtendsAboveBuildCeiling() {
+    if (!supported()) {
+      return;
+    }
+    int sulfurY = UPPER_WORLD_LIMIT - 2;
+    setData(baseX, sulfurY, baseZ, "minecraft:potent_sulfur[potent_sulfur_state=erupting]");
+    setType(baseX, sulfurY + 1, baseZ, Material.WATER);
+    assertEquals(LAUNCH, apply(0.0, boxAt(baseX, sulfurY + 6.8)));
+  }
+
   @Test(testCode = "EXCLUSIONS", severity = Severity.ERROR)
   public void excludedPlayersDoNotLaunch() {
     if (!supported()) {
@@ -210,8 +228,8 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
     }
     assertShape("POTENT_SULFUR", true);
     assertShape("SULFUR_SPIKE", false);
-    assertShape("SULFUR_SLAB", false);
-    assertShape("SULFUR_WALL", false);
+    assertSlabShape();
+    assertWallShape();
   }
 
   private boolean supported() {
@@ -239,13 +257,56 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
   }
 
   private void assertShape(String materialName, boolean cubic) {
+    BlockShape shape = shapeOf(materialName);
+    assertEquals(cubic, shape.isCubic());
+    setType(baseX + 3, baseY, baseZ, Material.AIR);
+  }
+
+  private void assertSlabShape() {
+    int x = baseX + 3;
+    BlockShape shape = shapeOf("SULFUR_SLAB");
+    BoundingBox outline = shape.outline();
+    assertEquals((double) baseY, outline.minY);
+    assertEquals(baseY + 0.5, outline.maxY);
+    assertTrue(shape.intersectsWith(BoundingBox.fromBounds(
+      x + 0.1, baseY + 0.1, baseZ + 0.1,
+      x + 0.9, baseY + 0.4, baseZ + 0.9
+    )));
+    assertFalse(shape.intersectsWith(BoundingBox.fromBounds(
+      x + 0.1, baseY + 0.6, baseZ + 0.1,
+      x + 0.9, baseY + 0.9, baseZ + 0.9
+    )));
+    setType(x, baseY, baseZ, Material.AIR);
+  }
+
+  private void assertWallShape() {
+    int x = baseX + 3;
+    BlockShape shape = shapeOf("SULFUR_WALL");
+    BoundingBox outline = shape.outline();
+    assertEquals(x + 0.25, outline.minX);
+    assertEquals(x + 0.75, outline.maxX);
+    assertEquals(baseZ + 0.25, outline.minZ);
+    assertEquals(baseZ + 0.75, outline.maxZ);
+    assertEquals(baseY + 1.5, outline.maxY);
+    assertTrue(shape.intersectsWith(BoundingBox.fromBounds(
+      x + 0.4, baseY + 0.1, baseZ + 0.4,
+      x + 0.6, baseY + 1.4, baseZ + 0.6
+    )));
+    assertFalse(shape.intersectsWith(BoundingBox.fromBounds(
+      x + 0.01, baseY + 0.1, baseZ + 0.01,
+      x + 0.2, baseY + 1.4, baseZ + 0.2
+    )));
+    setType(x, baseY, baseZ, Material.AIR);
+  }
+
+  private BlockShape shapeOf(String materialName) {
     Material material = Material.getMaterial(materialName);
     assertNotNull(material);
     int x = baseX + 3;
     setType(x, baseY, baseZ, material);
-    assertFalse(blockCache.collisionShapeAt(x, baseY, baseZ).isEmpty());
-    assertEquals(cubic, blockCache.collisionShapeAt(x, baseY, baseZ).isCubic());
-    setType(x, baseY, baseZ, Material.AIR);
+    BlockShape shape = blockCache.collisionShapeAt(x, baseY, baseZ);
+    assertFalse(shape.isEmpty());
+    return shape;
   }
 
   private void clearTestArea() {
@@ -255,6 +316,10 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
       }
     }
     setType(baseX + 3, baseY, baseZ, Material.AIR);
+    setType(baseX + 2, baseY, baseZ, Material.AIR);
+    setType(baseX + 4, baseY, baseZ, Material.AIR);
+    setType(baseX + 3, baseY, baseZ - 1, Material.AIR);
+    setType(baseX + 3, baseY, baseZ + 1, Material.AIR);
   }
 
   private void setType(int x, int y, int z, Material material) {
@@ -267,11 +332,24 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
     Block block = world.getBlockAt(x, y, z);
     remember(block);
     try {
-      BlockData blockData = (BlockData) Bukkit.class
+      Object blockData = Bukkit.class
         .getMethod("createBlockData", String.class)
         .invoke(null, data);
-      Block.class.getMethod("setBlockData", BlockData.class, boolean.class)
-        .invoke(block, blockData, false);
+      Method setter = null;
+      for (Method method : Block.class.getMethods()) {
+        Class<?>[] parameters = method.getParameterTypes();
+        if (method.getName().equals("setBlockData")
+          && parameters.length == 2
+          && parameters[0].isInstance(blockData)
+          && parameters[1] == boolean.class) {
+          setter = method;
+          break;
+        }
+      }
+      if (setter == null) {
+        throw new NoSuchMethodException("Block.setBlockData");
+      }
+      setter.invoke(block, blockData, false);
     } catch (ReflectiveOperationException exception) {
       throw new IllegalStateException(exception);
     }
@@ -289,6 +367,7 @@ public final class PotentSulfurPhysicsTests extends IntegrationTests {
     originalBlocks.clear();
     if (player != null) {
       UserRepository.unregisterUser(player);
+      assertFalse(UserRepository.hasUser(player));
     }
   }
 }

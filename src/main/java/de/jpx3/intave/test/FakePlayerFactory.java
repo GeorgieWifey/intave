@@ -47,8 +47,12 @@ public final class FakePlayerFactory {
   }
 
   public static Player createPlayer(BiFunction<String, Object[], Object> methodReturn) {
+    return createPlayer(FAKE_TEST_UUID, methodReturn);
+  }
+
+  public static Player createPlayer(UUID uniqueId, BiFunction<String, Object[], Object> methodReturn) {
     List<BiFunction<String, Object[], Object>> methods = new ArrayList<>();
-    methods.add(FakePlayerFactory::identity);
+    methods.add((methodName, arguments) -> methodName.equals("getUniqueId") ? uniqueId : identity(methodName, arguments));
     methods.add(methodReturn);
 
     Map<String, List<MetadataValue>> fakeMetadata = new HashMap<>();
