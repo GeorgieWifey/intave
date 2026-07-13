@@ -102,7 +102,7 @@ public final class EntityTypeResolver {
         EntityType entityType = packet.getEntityTypeModifier().read(0);
         Class<? extends Entity> entityClass = extractSubClassFromEntity(entityType.getEntityClass());
         String entityClassName = entityClass.getSimpleName();
-        HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass);
+        HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass, entityType);
         return new EntityTypeData(entityClassName, size, -2, false, 4);
       }
     }

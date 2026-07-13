@@ -14,9 +14,12 @@ import net.minecraft.server.v1_8_R3.World;
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftEntity;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,7 +47,13 @@ public final class HitboxSizeAccess {
   private static final Map<Class<?>, HitboxSize> nameCache = new ConcurrentHashMap<>();
 
   public static HitboxSize dimensionsOfNMSEntityClass(Class<?> klass) {
-    return nameCache.computeIfAbsent(klass, resolver::sizeOf);
+    return dimensionsOfNMSEntityClass(klass, null);
+  }
+
+  public static HitboxSize dimensionsOfNMSEntityClass(Class<?> klass, EntityType entityType) {
+    return nameCache.computeIfAbsent(klass, key -> entityType != null && resolver instanceof HitBoxAccessModern
+      ? ((HitBoxAccessModern) resolver).sizeOf(key, entityType)
+      : resolver.sizeOf(key));
   }
 
   @PatchyAutoTranslation
@@ -119,13 +128,16 @@ public final class HitboxSizeAccess {
     @PatchyAutoTranslation
     @Override
     public HitboxSize sizeOf(Class<?> entityClass) {
-      String className = entityClass.getSimpleName();
-      if (className.startsWith("Entity")) {
-        className = className.substring("Entity".length());
-      }
-      Optional<net.minecraft.server.v1_14_R1.EntityTypes<?>> optional = net.minecraft.server.v1_14_R1.EntityTypes.a(className.toLowerCase());
+      return sizeOf(entityClass, null);
+    }
+
+    @PatchyAutoTranslation
+    private HitboxSize sizeOf(Class<?> entityClass, EntityType entityType) {
+      Optional<?> optional = MinecraftVersions.VER26_2.atOrAbove()
+        ? RegistryAccess.entityType(entityTypeKey(entityClass, entityType))
+        : net.minecraft.server.v1_14_R1.EntityTypes.a(legacyEntityTypeName(entityClass));
       if (optional.isPresent()) {
-        net.minecraft.server.v1_14_R1.EntityTypes<?> entityTypes = optional.get();
+        Object entityTypes = optional.get();
         Object size;
         try {
           size = sizeAccess.invoke(entityTypes);
@@ -154,6 +166,73 @@ public final class HitboxSizeAccess {
         }
       } else {
         return HitboxSize.zero();
+      }
+    }
+
+    private static String legacyEntityTypeName(Class<?> entityClass) {
+      String className = entityClass.getSimpleName();
+      return (className.startsWith("Entity") ? className.substring("Entity".length()) : className).toLowerCase(Locale.ROOT);
+    }
+
+    private static String entityTypeKey(Class<?> entityClass, EntityType entityType) {
+      if (entityType != null) {
+        return RegistryAccess.bukkitKey(entityType);
+      }
+      String className = entityClass.getSimpleName();
+      if (className.startsWith("Entity")) {
+        className = className.substring("Entity".length());
+      }
+      String fallback = className.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
+      return "minecraft:" + fallback;
+    }
+
+    private static final class RegistryAccess {
+      private static final Class<?> IDENTIFIER_CLASS = classByName("net.minecraft.resources.Identifier");
+      private static final Method IDENTIFIER_TRY_PARSE = method(IDENTIFIER_CLASS, "tryParse", String.class);
+      private static final Object ENTITY_TYPE_REGISTRY = field("net.minecraft.core.registries.BuiltInRegistries", "ENTITY_TYPE");
+      private static final Method GET_OPTIONAL = method(ENTITY_TYPE_REGISTRY.getClass(), "getOptional", IDENTIFIER_CLASS);
+      private static final Method BUKKIT_GET_KEY = method(EntityType.class, "getKey");
+
+      private static Optional<?> entityType(String key) {
+        try {
+          Object identifier = IDENTIFIER_TRY_PARSE.invoke(null, key);
+          return identifier == null ? Optional.empty() : (Optional<?>) GET_OPTIONAL.invoke(ENTITY_TYPE_REGISTRY, identifier);
+        } catch (ReflectiveOperationException exception) {
+          throw new IllegalStateException("Unable to resolve entity type " + key, exception);
+        }
+      }
+
+      private static String bukkitKey(EntityType entityType) {
+        try {
+          return BUKKIT_GET_KEY.invoke(entityType).toString();
+        } catch (ReflectiveOperationException exception) {
+          throw new IllegalStateException("Unable to read Bukkit entity type key", exception);
+        }
+      }
+
+      private static Class<?> classByName(String name) {
+        try {
+          return Class.forName(name);
+        } catch (ClassNotFoundException exception) {
+          throw new IllegalStateException("Unable to find " + name, exception);
+        }
+      }
+
+      private static Method method(Class<?> owner, String name, Class<?>... parameters) {
+        try {
+          return owner.getMethod(name, parameters);
+        } catch (NoSuchMethodException exception) {
+          throw new IllegalStateException("Unable to find " + owner.getName() + "." + name, exception);
+        }
+      }
+
+      private static Object field(String ownerName, String name) {
+        try {
+          Field field = classByName(ownerName).getField(name);
+          return field.get(null);
+        } catch (ReflectiveOperationException exception) {
+          throw new IllegalStateException("Unable to find " + ownerName + "." + name, exception);
+        }
       }
     }
   }

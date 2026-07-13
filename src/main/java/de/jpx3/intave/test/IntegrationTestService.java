@@ -182,6 +182,7 @@ public final class IntegrationTestService implements EventProcessor {
       performTest(BlockShapePipelineTests.class);
       performTest(BlockShapeTests.class);
       performTest(EntitySizeTests.class);
+      performTest(PaperCompatibilityTests.class);
       performTest(StorageTests.class);
       performTest(FeedbackTests.class);
       performTest(ReaderTests.class);

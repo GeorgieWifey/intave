@@ -275,7 +275,7 @@ public final class EntityTracker extends Module {
     boolean oneInFourChance = ThreadLocalRandom.current().nextInt(4) == 0;
 
     if (/*isLivingEntity && isPlayer *//*&& hasRedTrustfactor*//* && oneInFourChance*/ false) {
-      int newId = IdentifierReserve.acquireNew();
+      int newId = IdentifierReserve.acquireNew(player.getWorld());
       duplicatedEntityIds.add(newId);
       duplicationOwners.put(newId, entityId);
 

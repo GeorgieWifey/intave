@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import java.util.*;
 
 public final class ProtocolMetadata {
+  public static final int VER_26_2 = 776; // 26.2
   public static int VER_26_1_1 = 775; // 26.1.1
   public static int VER_1_21_5 = 770; // 1.21.5
   public static int VER_1_21_3 = 768; // 1.21.3

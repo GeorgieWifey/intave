@@ -386,7 +386,7 @@ public final class FakePlayer extends FakePlayerBody {
         floating();
       }
       if (identifier <= 0) {
-        identifier = IdentifierReserve.acquireNew();
+        identifier = IdentifierReserve.acquireNew(observer.getWorld());
       }
       if (gameProfile == null) {
         gameProfile = acquireGameProfile();
