@@ -14,10 +14,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
 
 import static de.jpx3.intave.adapter.MinecraftVersions.VER26_2;
@@ -79,21 +81,39 @@ public final class IdentifierReserve {
   }
 
   private static int reserveEntityIdSynchronized(World world) {
-    if (Bukkit.isPrimaryThread()) {
-      return reserveEntityId(world);
+    return reserveEntityIdSynchronized(
+      Bukkit.isPrimaryThread(),
+      () -> reserveEntityId(world),
+      Synchronizer::synchronize,
+      5,
+      TimeUnit.SECONDS,
+      world.getName()
+    );
+  }
+
+  static int reserveEntityIdSynchronized(
+    boolean primaryThread,
+    IntSupplier reservation,
+    Executor synchronizer,
+    long timeout,
+    TimeUnit timeoutUnit,
+    String worldLabel
+  ) {
+    if (primaryThread) {
+      return reservation.getAsInt();
     }
-    FutureTask<Integer> reservation = new FutureTask<>(() -> reserveEntityId(world));
-    Synchronizer.synchronize(reservation);
+    FutureTask<Integer> reservationTask = new FutureTask<>(reservation::getAsInt);
+    synchronizer.execute(reservationTask);
     try {
-      return reservation.get(5, TimeUnit.SECONDS);
+      return reservationTask.get(timeout, timeoutUnit);
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while reserving entity ID", exception);
+      throw new IllegalStateException("Interrupted while reserving entity ID for " + worldLabel, exception);
     } catch (ExecutionException exception) {
-      throw new IllegalStateException("Unable to reserve entity ID for " + world.getName(), exception.getCause());
+      throw new IllegalStateException("Unable to reserve entity ID for " + worldLabel, exception.getCause());
     } catch (TimeoutException exception) {
-      reservation.cancel(false);
-      throw new IllegalStateException("Timed out while reserving entity ID for " + world.getName(), exception);
+      reservationTask.cancel(false);
+      throw new IllegalStateException("Timed out while reserving entity ID for " + worldLabel, exception);
     }
   }
 
