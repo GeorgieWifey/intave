@@ -10,8 +10,13 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -24,21 +29,24 @@ import static de.jpx3.intave.adapter.MinecraftVersions.VER26_2;
 public final class IdentifierReserve {
   private static final int REQUIRED_ID_POOL_SIZE = 25;
 
-  private static final Map<World, Queue<Integer>> availableIds = new ConcurrentHashMap<>();
+  private static final Map<UUID, Queue<Integer>> availableIds = new ConcurrentHashMap<>();
 
   public static void setup() {
     Bukkit.getWorlds().forEach(IdentifierReserve::refreshIfRequired);
   }
 
   public static int acquireNew(World world) {
-    Queue<Integer> worldIds = availableIds.computeIfAbsent(world, key -> new ConcurrentLinkedDeque<>());
+    Queue<Integer> worldIds = availableIds.computeIfAbsent(world.getUID(), key -> new ConcurrentLinkedDeque<>());
+    Integer identifier = worldIds.poll();
+    if (identifier == null) {
+      identifier = reserveEntityIdSynchronized(world);
+    }
     refreshIfRequired(world, worldIds);
-    Integer poll = worldIds.poll();
-    return poll != null ? poll : reserveEntityId(world);
+    return identifier;
   }
 
   private static void refreshIfRequired(World world) {
-    refreshIfRequired(world, availableIds.computeIfAbsent(world, key -> new ConcurrentLinkedDeque<>()));
+    refreshIfRequired(world, availableIds.computeIfAbsent(world.getUID(), key -> new ConcurrentLinkedDeque<>()));
   }
 
   private static void refreshIfRequired(World world, Queue<Integer> worldIds) {
@@ -68,6 +76,25 @@ public final class IdentifierReserve {
       throw new IllegalStateException("Unable to reserve entity ID");
     }
     return newId;
+  }
+
+  private static int reserveEntityIdSynchronized(World world) {
+    if (Bukkit.isPrimaryThread()) {
+      return reserveEntityId(world);
+    }
+    FutureTask<Integer> reservation = new FutureTask<>(() -> reserveEntityId(world));
+    Synchronizer.synchronize(reservation);
+    try {
+      return reservation.get(5, TimeUnit.SECONDS);
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while reserving entity ID", exception);
+    } catch (ExecutionException exception) {
+      throw new IllegalStateException("Unable to reserve entity ID for " + world.getName(), exception.getCause());
+    } catch (TimeoutException exception) {
+      reservation.cancel(false);
+      throw new IllegalStateException("Timed out while reserving entity ID for " + world.getName(), exception);
+    }
   }
 
   private static final class LegacyAccess {

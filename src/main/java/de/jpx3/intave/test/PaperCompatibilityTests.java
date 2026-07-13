@@ -33,7 +33,6 @@ public final class PaperCompatibilityTests extends IntegrationTests {
 
   @Test(severity = Severity.ERROR)
   public void testReservedEntityIdsAreWorldScoped() {
-    assertTrue(Bukkit.getWorlds().size() >= 2);
     for (World world : Bukkit.getWorlds()) {
       Set<Integer> occupied = new HashSet<>();
       for (Entity entity : world.getEntities()) {

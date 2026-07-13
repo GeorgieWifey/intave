@@ -45,15 +45,17 @@ public final class HitboxSizeAccess {
   }
 
   private static final Map<Class<?>, HitboxSize> nameCache = new ConcurrentHashMap<>();
+  private static final Map<EntityType, HitboxSize> typeCache = new ConcurrentHashMap<>();
 
   public static HitboxSize dimensionsOfNMSEntityClass(Class<?> klass) {
     return dimensionsOfNMSEntityClass(klass, null);
   }
 
   public static HitboxSize dimensionsOfNMSEntityClass(Class<?> klass, EntityType entityType) {
-    return nameCache.computeIfAbsent(klass, key -> entityType != null && resolver instanceof HitBoxAccessModern
-      ? ((HitBoxAccessModern) resolver).sizeOf(key, entityType)
-      : resolver.sizeOf(key));
+    if (entityType != null && resolver instanceof HitBoxAccessModern) {
+      return typeCache.computeIfAbsent(entityType, key -> ((HitBoxAccessModern) resolver).sizeOf(klass, key));
+    }
+    return nameCache.computeIfAbsent(klass, resolver::sizeOf);
   }
 
   @PatchyAutoTranslation
