@@ -43,14 +43,18 @@ public final class EntitySizeTests extends IntegrationTests {
     }
     World world = Bukkit.getWorlds().get(0);
     MushroomCow mushroomCow = world.spawn(new Location(world, 0, 0, 0), MushroomCow.class);
-    Class<?> entityClass = ReflectiveHandleAccess.handleOf(mushroomCow).getClass();
-    HitboxSize fallback = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass);
-    if (fallback.width() != 0 || fallback.height() != 0) {
-      fail("Mushroom cow class fallback unexpectedly resolved " + fallback);
-    }
-    HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass, mushroomCow.getType());
-    if (Math.abs(size.width() - 0.9) > 0.01 || Math.abs(size.height() - 1.4) > 0.01) {
-      fail("Failed to fetch mushroom cow size, is " + size);
+    try {
+      Class<?> entityClass = ReflectiveHandleAccess.handleOf(mushroomCow).getClass();
+      HitboxSize fallback = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass);
+      if (fallback.width() != 0 || fallback.height() != 0) {
+        fail("Mushroom cow class fallback unexpectedly resolved " + fallback);
+      }
+      HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass, mushroomCow.getType());
+      if (Math.abs(size.width() - 0.9) > 0.01 || Math.abs(size.height() - 1.4) > 0.01) {
+        fail("Failed to fetch mushroom cow size, is " + size);
+      }
+    } finally {
+      mushroomCow.remove();
     }
   }
 
@@ -63,10 +67,14 @@ public final class EntitySizeTests extends IntegrationTests {
     }
     World world = Bukkit.getWorlds().get(0);
     IronGolem ironGolem = world.spawn(new Location(world, 0, 0, 0), IronGolem.class);
-    Class<?> entityClass = ReflectiveHandleAccess.handleOf(ironGolem).getClass();
-    HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass);
-    if (Math.abs(size.width() - 1.4) > 0.01 || Math.abs(size.height() - 2.7) > 0.01) {
-      fail("Failed to fetch iron golem size, is " + size);
+    try {
+      Class<?> entityClass = ReflectiveHandleAccess.handleOf(ironGolem).getClass();
+      HitboxSize size = HitboxSizeAccess.dimensionsOfNMSEntityClass(entityClass);
+      if (Math.abs(size.width() - 1.4) > 0.01 || Math.abs(size.height() - 2.7) > 0.01) {
+        fail("Failed to fetch iron golem size, is " + size);
+      }
+    } finally {
+      ironGolem.remove();
     }
   }
 

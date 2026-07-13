@@ -1,5 +1,6 @@
 package de.jpx3.intave.player.fake;
 
+import de.jpx3.intave.cleanup.GarbageCollector;
 import de.jpx3.intave.executor.Synchronizer;
 import de.jpx3.intave.klass.Lookup;
 import org.bukkit.Bukkit;
@@ -10,7 +11,6 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
@@ -31,14 +31,15 @@ import static de.jpx3.intave.adapter.MinecraftVersions.VER26_2;
 public final class IdentifierReserve {
   private static final int REQUIRED_ID_POOL_SIZE = 25;
 
-  private static final Map<UUID, Queue<Integer>> availableIds = new ConcurrentHashMap<>();
+  private static final Map<World, Queue<Integer>> availableIds =
+    GarbageCollector.watch(new ConcurrentHashMap<>());
 
   public static void setup() {
     Bukkit.getWorlds().forEach(IdentifierReserve::refreshIfRequired);
   }
 
   public static int acquireNew(World world) {
-    Queue<Integer> worldIds = availableIds.computeIfAbsent(world.getUID(), key -> new ConcurrentLinkedDeque<>());
+    Queue<Integer> worldIds = availableIds.computeIfAbsent(world, key -> new ConcurrentLinkedDeque<>());
     Integer identifier = worldIds.poll();
     if (identifier == null) {
       identifier = reserveEntityIdSynchronized(world);
@@ -48,7 +49,7 @@ public final class IdentifierReserve {
   }
 
   private static void refreshIfRequired(World world) {
-    refreshIfRequired(world, availableIds.computeIfAbsent(world.getUID(), key -> new ConcurrentLinkedDeque<>()));
+    refreshIfRequired(world, availableIds.computeIfAbsent(world, key -> new ConcurrentLinkedDeque<>()));
   }
 
   private static void refreshIfRequired(World world, Queue<Integer> worldIds) {
