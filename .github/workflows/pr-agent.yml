@@ -16,11 +16,12 @@ concurrency:
 
 env:
   OPENAI__API_BASE: https://lumine.linacats.top/v1
-  CONFIG__MODEL: openai/gpt-6.1-sol
+  CONFIG__MODEL: openai/gpt-6.2-sol
   CONFIG__FALLBACK_MODELS: '["openai/gpt-6-luna"]'
   CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
   CONFIG__REASONING_EFFORT: medium
-  CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS: '["gpt-6.1-sol", "gpt-6-luna"]'
+  CONFIG__NO_TEMPERATURE_MODELS: '["gpt-6.2-sol"]'
+  CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS: '["gpt-6.2-sol", "gpt-6-luna"]'
   CONFIG__AI_TIMEOUT: '180'
   CONFIG__NUM_RETRIES: '2'
   GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
@@ -65,7 +66,7 @@ jobs:
             -e OPENAI__KEY -e OPENAI__API_BASE -e CONFIG__MODEL \
             -e CONFIG__FALLBACK_MODELS -e CONFIG__CUSTOM_MODEL_MAX_TOKENS \
             -e CONFIG__REASONING_EFFORT -e CONFIG__ADDITIONAL_REASONING_EFFORT_MODELS \
-            -e CONFIG__AI_TIMEOUT -e CONFIG__NUM_RETRIES \
+            -e CONFIG__AI_TIMEOUT -e CONFIG__NUM_RETRIES -e CONFIG__NO_TEMPERATURE_MODELS \
             pragent/pr-agent:0.50.0-github_action - <<'PY'
           import asyncio
           from pr_agent.config_loader import get_settings
